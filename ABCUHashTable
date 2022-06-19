@@ -1,0 +1,397 @@
+//Scott Rowe
+//Professor Dewin Andujar
+//CS-300
+//June 19, 2022
+
+#include <iostream>
+#include <fstream>
+#include <string>
+#include "CSVparser.hpp"
+
+using namespace std;
+//=======================================================================================================================
+//=======================================================================================================================
+
+const unsigned int DEFAULT_SIZE = 30;
+
+// forward declarations
+double strToDouble(string str, char ch);
+
+// define a structure to hold course information
+struct Course {
+    string courseNumber;
+    string courseName;
+    string courseTitle;
+    string coursePrereq;
+    Course() {}
+};
+//============================================================================
+// CourseHashTable class definition
+//============================================================================
+
+/**
+ * Define a class containing data members and methods to
+ * implement a hash table with chaining.
+ */
+class CourseHashTable {
+
+private:
+    // Define structures to hold courses
+    struct Node {
+        Course course;
+        unsigned int key;
+        Node* next;
+
+        // default constructor
+        Node() {
+            key = UINT_MAX;
+            next = nullptr;
+        }
+
+        // initialize with a course
+        Node(Course aCourse) : Node() {
+            course = aCourse;
+        }
+
+        // initialize with a bid and a key
+        Node(Course aCourse, unsigned int aKey) : Node(aCourse) {
+            key = aKey;
+        }
+    };
+
+    vector<Node> coursePrereq;
+
+    unsigned int tableSize = DEFAULT_SIZE;
+
+    unsigned int hash(int key);
+
+public:
+    CourseHashTable();
+    CourseHashTable(unsigned int size);
+    virtual ~CourseHashTable();
+    void Insert(Course course);
+    void Remove(string courseNumber);
+    int NumPrerequisiteCourses(Course course);
+    void PrintSampleSchedule();
+    void PrintCourseInformation(string courseNumber);
+    Course Search(string courseNumber);
+};
+
+/**
+ * Default constructor
+ */
+CourseHashTable::CourseHashTable() {
+    // Initalized the node structure for resizing tableSize
+    coursePrereq.resize(tableSize);
+}
+
+/**
+ * Constructor for specifying size of the table
+ * Use to improve efficiency of hashing algorithm
+ * by reducing collisions without wasting memory.
+ */
+CourseHashTable::CourseHashTable(unsigned int size) {
+    // invoke local tableSize to size with this->
+    this->tableSize = size;
+    //resize the nodes for tableSize
+    coursePrereq.resize(tableSize);
+}
+
+/**
+ * Destructor
+ */
+CourseHashTable::~CourseHashTable() {
+    // erasing the node from the beginning
+    coursePrereq.erase(coursePrereq.begin());
+}
+
+/**
+ * Calculate the hash value of a given key.
+ * Note that key is specifically defined as
+ * unsigned int to prevent undefined results
+ * of a negative list index.
+ *
+ * @param key The key to hash
+ * @return The calculated hash
+ */
+unsigned int CourseHashTable::hash(int key) {
+    // return key tableSize
+    return key % tableSize;
+}
+
+/**
+ * Insert a bid
+ *
+ * @param bid The bid to insert
+ */
+void CourseHashTable::Insert(Course course) {
+    //Created the key for the given course
+    unsigned key = hash(atoi(course.courseNumber.c_str()));
+
+    //retrieve the node using key
+    Node* oldNode = &(coursePrereq.at(key));
+
+    // if no entry found for the key
+    if (oldNode == nullptr) {
+        Node* newNode = new Node(course, key);
+        coursePrereq.insert(coursePrereq.begin() + key, (*newNode));
+    }
+    else {
+        //node found
+        if (oldNode->key == UINT_MAX) {
+            oldNode->key = key;
+            oldNode->course = course;
+            oldNode->next = nullptr;
+        }
+        else {
+            //find the next open node
+            while (oldNode->next != nullptr) {
+                oldNode = oldNode->next;
+            }
+            //add new newNode to end
+            oldNode->next = new Node(course, key);
+        }
+    }
+}
+
+/**
+ * Remove a course
+ *
+ * @param courseNumber The course number to search for
+ */
+void CourseHashTable::Remove(string courseNumber) {
+    // set key equal to hash atoi bidID cstring
+    unsigned key = hash(atoi(courseNumber.c_str()));
+    // erase node begin and key
+    coursePrereq.erase(coursePrereq.begin() + key);
+}
+
+/**
+ * Search for the specified courseNumber
+ *
+ * @param bidId The bid id to search for
+ */
+Course CourseHashTable::Search(string courseNumber) {
+    Course course;
+
+    //Created the key for the given course
+    unsigned key = hash(atoi(course.courseNumber.c_str()));
+
+    //retrieve the node using key
+    Node* node = &(coursePrereq.at(key));
+
+    // if entry found for the key
+    if (node != nullptr && node->key != UINT_MAX
+        && node->course.courseNumber.compare(courseNumber) == 0) {
+        return node->course;
+    }
+    // if no entry found for the key
+    if (node == nullptr || node->key == UINT_MAX) {
+        return course;
+    }
+
+    // while node not equal to nullptr
+    while (node != nullptr) {
+        if (node->key != UINT_MAX && node->course.courseNumber.compare(courseNumber) == 0) {
+            return node->course;
+        }
+        node = node->next;
+    }
+    return course;
+}
+
+//returning the coursePrerequistites that pass through the course
+
+int CourseHashTable::NumPrerequisiteCourses(Course course) {
+    int count = 0;
+    for (unsigned int i = 0; i < course.coursePrereq.size(); i++) {
+        if (coursePrereq.at(i).key > 0)
+            count++;
+    }
+    return count;
+}
+
+void CourseHashTable::PrintSampleSchedule() {
+    this->PrintSampleSchedule();
+}
+
+void CourseHashTable::PrintCourseInformation(string courseNumber) {
+    this->PrintCourseInformation(courseNumber);
+}
+
+
+//============================================================================
+// Static methods used for testing
+//============================================================================
+
+/**
+ * Load a CSV file containing bids into a container
+ *
+ * @param csvPath the path to the CSV file to load
+ * @return a container holding all the courses read
+ */
+void loadCourses(string csvPath, CourseHashTable* hashTable) {
+    cout << "Loading CSV file " << csvPath << endl;
+
+    // initialize the CSV Parser using the given path
+    csv::Parser file = csv::Parser(csvPath);
+
+    // read and display header row - optional
+    vector<string> header = file.getHeader();
+    for (auto const& c : header) {
+        cout << c << " | ";
+    }
+    cout << "" << endl;
+
+    try {
+        // loop to read rows of a CSV file
+        for (unsigned int i = 0; i < file.rowCount(); i++) {
+
+            // Create a data structure and add to the collection of bids
+            Course course;
+            course.courseNumber = file[i][0];
+            course.courseName = file[i][1];
+            
+            // push this course to the end
+            hashTable->Insert(course);
+        }
+    }
+    catch (csv::Error& e) {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
+/**
+ * Simple C function to convert a string to a double
+ * after stripping out unwanted char
+ *
+ * credit: http://stackoverflow.com/a/24875936
+ *
+ * @param ch The character to strip out
+ */
+double strToDouble(string str, char ch) {
+    str.erase(remove(str.begin(), str.end(), ch), str.end());
+    return atof(str.c_str());
+}
+
+/**
+ * The one and only main() method
+ */
+int main(int argc, char* argv[]) {
+
+    // process command line arguments
+    string csvPath, courseNumber;
+    switch (argc) {
+    case 2:
+        csvPath = argv[1];
+        break;
+    case 3:
+        csvPath = argv[1];
+        courseNumber = argv[2];
+        break;
+    default:
+        csvPath = "";
+        break;
+    }
+
+    // Define a timer variable
+    clock_t ticks;
+
+    // Define a hash table to hold all the courses
+    CourseHashTable* courseTable;
+
+    Course course;
+    courseTable = new CourseHashTable();
+
+    //user welcome
+    cout << "\nWelcometo the course planner!\n" << endl;
+
+    int choice = 0;
+    while (choice != 4) {
+        cout << "Menu:" << endl;
+        cout << "  1. Load Data Structure" << endl;
+        cout << "  2. Print Course List" << endl;
+        cout << "  3. Print Course" << endl;
+        cout << "  4. Exit" << endl;
+        cout << "\nWhat would you like to do?";
+        cin >> choice;
+
+        switch (choice) {
+
+        case 1:
+
+            // Initialize a timer variable before loading bids
+            ticks = clock();
+
+            // Complete the method call to load the bids
+            loadCourses(csvPath, courseTable);
+
+            //get file path name and load courses
+            if (courseTable == nullptr) {
+                courseTable = new CourseHashTable();
+                if (csvPath.length() == 0) {
+                    cout << "Enter the course name that contains the data: ";
+                    cin >> csvPath;
+                }
+            }
+            
+            // if file was loaded and opened successfully
+            bool success;
+            success; loadCourses(csvPath, courseTable);
+            if (success)
+                cout << "Courses are loaded\n" << endl;
+            else
+                cout << "Not found\n" << endl;
+            csvPath = "";
+            
+            // Calculate elapsed time and display result
+            ticks = clock() - ticks; // current clock ticks minus starting clock ticks
+            cout << "time: " << ticks << " clock ticks" << endl;
+            cout << "time: " << ticks * 1.0 / CLOCKS_PER_SEC << " seconds" << endl;
+            break;
+
+            //intialize print sample
+        case 2:
+            if (courseTable != nullptr && success) {
+                cout << "Here is a sample schedule:\n" << endl;
+                courseTable->PrintSampleSchedule();
+                cout << endl;
+            }
+            else
+                cout << "Loaded courses - option 1\n" << endl;
+            break;
+
+        case 3:
+            ticks = clock();
+
+            ticks = clock() - ticks; // current clock ticks minus starting clock ticks
+
+            if (courseTable != nullptr && success) {
+                if (courseNumber.length() == 0) {
+                    cout << "What course do you want to know about?";
+                    cin >> courseNumber;
+                    for (auto& userChoice : courseNumber) userChoice = toupper(userChoice);
+                }
+                courseTable->PrintCourseInformation(courseNumber);
+                cout << endl;
+            }
+            else
+                cout << "Loaded course - option 1\n" << endl;
+            courseNumber = "";
+
+            cout << "time: " << ticks << " clock ticks" << endl;
+            cout << "time: " << ticks * 1.0 / CLOCKS_PER_SEC << " seconds" << endl;
+            break;
+
+            //Invalid typed info
+        default:
+            if (choice != 4);
+                cout << choice << "is invalid response\n" << endl;
+            break;
+        }
+    }
+
+    cout << "Thank you for using the course planner! Good bye." << endl;
+
+    return 0;
+}
